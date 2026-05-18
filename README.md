@@ -25,28 +25,58 @@ It does not receive prompts, workflows, documents, task outputs, logs, user iden
 
 ## Setup
 
-1. Create a separate repository for this collector service.
-2. Deploy it to a host that can stay online continuously.
-3. Install dependencies:
+### Local Development
+
+1. Clone this repository:
+
+```bash
+git clone https://github.com/vmDeshpande/telematry-website.git
+cd telematry-website
+```
+
+2. Install dependencies:
 
 ```bash
 npm install
 ```
 
-4. Copy `.env.example` to `.env` and configure values:
+3. Copy `.env.example` to `.env` and configure values:
 
-- `PORT`: port to run the collector on.
-- `SESSION_SECRET`: secret for session authentication.
-- `TELEMETRY_ADMIN_PASSWORD`: password used to log into the dashboard.
-- `TELEMETRY_DB_PATH`: path to the local SQLite database file.
-- `TELEMETRY_RATE_LIMIT_MAX_REQUESTS`: maximum collector requests per window, default `60`.
-- `TELEMETRY_RATE_LIMIT_WINDOW_MS`: window length in milliseconds for rate limiting, default `60000`.
+```bash
+cp .env.example .env
+```
 
-5. Start the service:
+4. Update these critical values in `.env`:
+
+- `SESSION_SECRET`: Generate a secure random string (e.g., `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`)
+- `TELEMETRY_ADMIN_PASSWORD`: Set a strong password for dashboard access
+- `TELEMETRY_DB_PATH`: Path to SQLite database (default: `./telemetry.db` for dev, `/tmp/telemetry.db` for production)
+- `PORT`: Server port (default: `3000`)
+- `TELEMETRY_RATE_LIMIT_MAX_REQUESTS`: Max requests per window (default: `60`)
+- `TELEMETRY_RATE_LIMIT_WINDOW_MS`: Rate limit window in ms (default: `60000`)
+
+5. Start the development server:
 
 ```bash
 npm start
 ```
+
+The collector will be available at `http://localhost:3000`.
+
+### Production Deployment (Vercel)
+
+1. Connect your GitHub repository to Vercel
+2. Add environment variables in Vercel project settings:
+   - `SESSION_SECRET`: Generate a secure random value
+   - `TELEMETRY_ADMIN_PASSWORD`: Set a strong password
+   - `NODE_ENV`: Set to `production`
+3. Deploy with:
+
+```bash
+vercel --prod
+```
+
+Or push to the main branch and Vercel will auto-deploy.
 
 ## Main App Configuration
 
