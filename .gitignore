@@ -1,3 +1,9 @@
 telemetry.db
 node_modules/
 .env
+.env.local
+.env.*.local
+*.db
+*.db-journal
+.DS_Store
+.vercel
