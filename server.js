@@ -29,35 +29,33 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, "public")));
 app.set("trust proxy", 1);
 
-// Session configuration with MongoDB store for production
-async function setupSession() {
-  const sessionConfig = {
-    secret: SESSION_SECRET,
-    resave: false,
-    saveUninitialized: false,
-    cookie: {
-      sameSite: "strict",
-      secure: process.env.NODE_ENV === "production",
-      httpOnly: true,
-      maxAge: 24 * 60 * 60 * 1000, // 24 hours
-    },
-  };
+// Session configuration
+const sessionConfig = {
+  secret: SESSION_SECRET,
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    sameSite: "strict",
+    secure: process.env.NODE_ENV === "production",
+    httpOnly: true,
+    maxAge: 24 * 60 * 60 * 1000, // 24 hours
+  },
+};
 
-  if (process.env.NODE_ENV === "production") {
-    sessionConfig.store = MongoStore.create({
-      mongoUrl: MONGODB_URI,
-      dbName: MONGODB_DB_NAME,
-      touchAfter: 24 * 3600, // lazy session update (in seconds)
-    });
-  }
-
-  app.use(session(sessionConfig));
+// Create session store synchronously for development, with async initialization for production
+if (process.env.NODE_ENV === "production") {
+  // For production, create store with MongoDB
+  const mongoUrl = MONGODB_URI;
+  const dbName = MONGODB_DB_NAME;
+  sessionConfig.store = MongoStore.create({
+    mongoUrl: mongoUrl,
+    dbName: dbName,
+    touchAfter: 24 * 3600, // lazy session update (in seconds)
+  });
 }
 
-// Initialize session middleware
-setupSession().catch((err) => {
-  console.error("Failed to setup session store:", err.message);
-});
+// Apply session middleware
+app.use(session(sessionConfig));
 
 app.use((req, res, next) => {
   res.setHeader("X-Content-Type-Options", "nosniff");
