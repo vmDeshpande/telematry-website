@@ -2,34 +2,14 @@
   "version": 2,
   "buildCommand": "npm run build",
   "env": {
-    "SESSION_SECRET": {
-      "description": "Secret key for session encryption"
-    },
-    "TELEMETRY_ADMIN_PASSWORD": {
-      "description": "Password for admin dashboard access"
-    },
-    "TELEMETRY_DB_PATH": {
-      "description": "Path to SQLite database file",
-      "value": "/tmp/telemetry.db"
-    },
-    "TELEMETRY_RATE_LIMIT_MAX_REQUESTS": {
-      "description": "Max requests per window",
-      "value": "60"
-    },
-    "TELEMETRY_RATE_LIMIT_WINDOW_MS": {
-      "description": "Rate limit window in milliseconds",
-      "value": "60000"
-    },
-    "NODE_ENV": {
-      "value": "production"
-    },
-    "PORT": {
-      "value": "3000"
-    }
+    "NODE_ENV": "production",
+    "TELEMETRY_DB_PATH": "/tmp/telemetry.db",
+    "TELEMETRY_RATE_LIMIT_MAX_REQUESTS": "60",
+    "TELEMETRY_RATE_LIMIT_WINDOW_MS": "60000",
+    "PORT": "3000"
   },
   "functions": {
     "server.js": {
-      "memory": 256,
       "maxDuration": 30
     }
   }
