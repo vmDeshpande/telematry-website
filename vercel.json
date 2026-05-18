@@ -3,10 +3,12 @@
   "buildCommand": "npm run build",
   "env": {
     "SESSION_SECRET": {
-      "description": "Secret key for session encryption"
+      "description": "Secret key for session encryption",
+      "value": "change-me-to-a-secure-random-string"
     },
     "TELEMETRY_ADMIN_PASSWORD": {
-      "description": "Password for admin dashboard access"
+      "description": "Password for admin dashboard access",
+      "value": "change-me-to-a-strong-password"
     },
     "TELEMETRY_DB_PATH": {
       "description": "Path to SQLite database file",
