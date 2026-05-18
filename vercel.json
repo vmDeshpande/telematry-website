@@ -10,7 +10,6 @@
   },
   "functions": {
     "server.js": {
-      "memory": 256,
       "maxDuration": 30
     }
   }
