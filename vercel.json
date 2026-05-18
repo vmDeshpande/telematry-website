@@ -5,12 +5,18 @@
     "NODE_ENV": "production",
     "MONGODB_DB_NAME": "telemetry_collector",
     "TELEMETRY_RATE_LIMIT_MAX_REQUESTS": "60",
-    "TELEMETRY_RATE_LIMIT_WINDOW_MS": "60000",
-    "PORT": "3000"
+    "TELEMETRY_RATE_LIMIT_WINDOW_MS": "60000"
   },
   "functions": {
     "server.js": {
-      "maxDuration": 30
+      "maxDuration": 30,
+      "memory": 1024
     }
-  }
+  },
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/server.js"
+    }
+  ]
 }
