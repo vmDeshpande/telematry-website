@@ -1,6 +1,7 @@
 require("dotenv").config();
 const express = require("express");
 const session = require("express-session");
+const { MongoStore } = require("connect-mongo");
 const { MongoClient } = require("mongodb");
 const path = require("path");
 const app = express();
@@ -27,18 +28,34 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(express.static(path.join(__dirname, "public")));
 app.set("trust proxy", 1);
-app.use(
-  session({
-    secret: SESSION_SECRET,
-    resave: false,
-    saveUninitialized: false,
-    cookie: {
-      sameSite: "strict",
-      secure: process.env.NODE_ENV === "production",
-      httpOnly: true,
-    },
-  })
-);
+
+// Session configuration
+const sessionConfig = {
+  secret: SESSION_SECRET,
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    sameSite: "strict",
+    secure: process.env.NODE_ENV === "production",
+    httpOnly: true,
+    maxAge: 24 * 60 * 60 * 1000, // 24 hours
+  },
+};
+
+// Create session store synchronously for development, with async initialization for production
+if (process.env.NODE_ENV === "production") {
+  // For production, create store with MongoDB
+  const mongoUrl = MONGODB_URI;
+  const dbName = MONGODB_DB_NAME;
+  sessionConfig.store = new MongoStore({
+    mongoUrl: mongoUrl,
+    dbName: dbName,
+    touchAfter: 24 * 3600, // lazy session update (in seconds)
+  });
+}
+
+// Apply session middleware
+app.use(session(sessionConfig));
 
 app.use((req, res, next) => {
   res.setHeader("X-Content-Type-Options", "nosniff");
@@ -241,13 +258,34 @@ async function initializeDatabase() {
   ]);
 }
 
-initializeDatabase()
-  .then(() => {
-    app.listen(PORT, "0.0.0.0", () => {
-      console.log(`Telemetry collector running on http://localhost:${PORT}`);
+// Initialize database on server start for development
+if (process.env.NODE_ENV !== "production") {
+  initializeDatabase()
+    .then(() => {
+      app.listen(PORT, "0.0.0.0", () => {
+        console.log(`Telemetry collector running on http://localhost:${PORT}`);
+      });
+    })
+    .catch((err) => {
+      console.error("Failed to connect to MongoDB:", err.message);
+      process.exit(1);
     });
-  })
-  .catch((err) => {
-    console.error("Failed to connect to MongoDB:", err.message);
-    process.exit(1);
-  });
+}
+
+// Export for Vercel serverless functions
+module.exports = app;
+
+// For production, initialize database before first request
+let dbInitialized = false;
+app.use(async (req, res, next) => {
+  if (!dbInitialized) {
+    try {
+      await initializeDatabase();
+      dbInitialized = true;
+    } catch (err) {
+      console.error("Failed to initialize database:", err.message);
+      return res.status(500).json({ ok: false, error: "database_init_failed" });
+    }
+  }
+  next();
+});
