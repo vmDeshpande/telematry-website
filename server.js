@@ -1,6 +1,7 @@
 require("dotenv").config();
 const express = require("express");
 const session = require("express-session");
+const MongoStore = require("connect-mongo");
 const { MongoClient } = require("mongodb");
 const path = require("path");
 const app = express();
@@ -23,46 +24,40 @@ const mongoClient = new MongoClient(MONGODB_URI);
 let instancesCollection;
 let eventsCollection;
 
-// Simple in-memory session store for production
-const sessionStore = process.env.NODE_ENV === "production" 
-  ? {
-      sessions: new Map(),
-      get: function(sid, callback) {
-        callback(null, this.sessions.get(sid) || null);
-      },
-      set: function(sid, sess, callback) {
-        this.sessions.set(sid, sess);
-        callback(null);
-      },
-      destroy: function(sid, callback) {
-        this.sessions.delete(sid);
-        callback(null);
-      }
-    }
-  : undefined; // Use default MemoryStore for development
-
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(express.static(path.join(__dirname, "public")));
 app.set("trust proxy", 1);
 
-const sessionConfig = {
-  secret: SESSION_SECRET,
-  resave: false,
-  saveUninitialized: false,
-  cookie: {
-    sameSite: "strict",
-    secure: process.env.NODE_ENV === "production",
-    httpOnly: true,
-    maxAge: 24 * 60 * 60 * 1000, // 24 hours
-  },
-};
+// Session configuration with MongoDB store for production
+async function setupSession() {
+  const sessionConfig = {
+    secret: SESSION_SECRET,
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      sameSite: "strict",
+      secure: process.env.NODE_ENV === "production",
+      httpOnly: true,
+      maxAge: 24 * 60 * 60 * 1000, // 24 hours
+    },
+  };
 
-if (sessionStore) {
-  sessionConfig.store = sessionStore;
+  if (process.env.NODE_ENV === "production") {
+    sessionConfig.store = MongoStore.create({
+      mongoUrl: MONGODB_URI,
+      dbName: MONGODB_DB_NAME,
+      touchAfter: 24 * 3600, // lazy session update (in seconds)
+    });
+  }
+
+  app.use(session(sessionConfig));
 }
 
-app.use(session(sessionConfig));
+// Initialize session middleware
+setupSession().catch((err) => {
+  console.error("Failed to setup session store:", err.message);
+});
 
 app.use((req, res, next) => {
   res.setHeader("X-Content-Type-Options", "nosniff");
