@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Telemetry Collector Login</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <div class="page-shell" style="display:grid;place-items:center;min-height:100vh;padding:0;">
+    <div class="card" style="max-width:420px;width:100%;padding:32px;">
+      <h1 style="margin-bottom:16px;font-size:1.8rem;">Collector Login</h1>
+      <p style="color:#94a3b8;margin-bottom:24px;">Sign in to access telemetry insights and platform activity.</p>
+      <div id="errorBanner" class="error-banner" style="display:none;"></div>
+      <form method="POST" action="/login">
+        <label for="password" style="display:block;margin-bottom:8px;color:#cbd5e1;">Admin password</label>
+        <input id="password" name="password" type="password" autocomplete="current-password" required style="margin-bottom:18px;" />
+        <button class="logout-button" type="submit">Sign in</button>
+      </form>
+      <p style="margin-top:18px;color:#94a3b8;font-size:0.95rem;">Only authorized admins may view collected telemetry.</p>
+    </div>
+  </div>
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const error = params.get('error');
+    if (error) {
+      const banner = document.getElementById('errorBanner');
+      banner.textContent = decodeURIComponent(error);
+      banner.style.display = 'block';
+    }
+  </script>
+</body>
+</html>

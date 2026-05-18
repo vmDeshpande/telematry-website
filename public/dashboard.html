@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Telemetry Dashboard</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <div class="page-shell">
+    <div class="topbar">
+      <div class="brand">
+        <h1>Telemetry Collector</h1>
+        <p>Analyze incoming platform telemetry in a secure admin dashboard, with filtering and activity summary.</p>
+      </div>
+      <a class="logout-button" href="/logout">Logout</a>
+    </div>
+
+    <div id="loadError" class="error-banner" style="display:none;"></div>
+
+    <div class="card-grid">
+      <div class="card">
+        <h2>Total events</h2>
+        <div class="metric"><strong id="eventCount">0</strong><span>collected telemetry events</span></div>
+      </div>
+      <div class="card">
+        <h2>Unique instances</h2>
+        <div class="metric"><strong id="instanceCount">0</strong><span>platform deployments</span></div>
+      </div>
+      <div class="card">
+        <h2>Latest event</h2>
+        <div class="metric"><strong id="latestReceivedAt">—</strong><span>most recent heartbeat</span></div>
+      </div>
+      <div class="card">
+        <h2>Collector status</h2>
+        <div class="status-pill" id="collectorStatus">Active</div>
+      </div>
+    </div>
+
+    <div class="card-grid">
+      <div class="panel">
+        <h3>Top versions</h3>
+        <ul id="topVersions" style="margin:0;padding:0;list-style:none;display:grid;gap:10px;"></ul>
+      </div>
+      <div class="panel">
+        <h3>Top platforms</h3>
+        <ul id="topPlatforms" style="margin:0;padding:0;list-style:none;display:grid;gap:10px;"></ul>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="filter-bar">
+        <input id="searchInput" type="text" placeholder="Search instance, version, platform, features..." />
+        <select id="versionFilter">
+          <option value="">All versions</option>
+        </select>
+        <select id="platformFilter">
+          <option value="">All platforms</option>
+        </select>
+      </div>
+
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Instance ID</th>
+              <th>Version</th>
+              <th>Platform</th>
+              <th>Features</th>
+              <th>Telemetry time</th>
+              <th>Received at</th>
+            </tr>
+          </thead>
+          <tbody id="eventTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <footer>Telemetry collector UI for self-hosted platform analytics.</footer>
+  </div>
+
+  <script src="/dashboard.js"></script>
+</body>
+</html>
