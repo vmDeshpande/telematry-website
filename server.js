@@ -117,6 +117,13 @@ function validateTelemetryPayload(payload) {
   );
 }
 
+app.get("/", (req, res) => {
+  if (req.session && req.session.authenticated) {
+    return res.redirect("/dashboard");
+  }
+  res.redirect("/login");
+});
+
 app.get("/login", (req, res) => {
   if (req.session && req.session.authenticated) {
     return res.redirect("/dashboard");
