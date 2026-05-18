@@ -1,7 +1,7 @@
 require("dotenv").config();
 const express = require("express");
 const session = require("express-session");
-const MongoStore = require("connect-mongo");
+const { MongoStore } = require("connect-mongo");
 const { MongoClient } = require("mongodb");
 const path = require("path");
 const app = express();
@@ -47,7 +47,7 @@ if (process.env.NODE_ENV === "production") {
   // For production, create store with MongoDB
   const mongoUrl = MONGODB_URI;
   const dbName = MONGODB_DB_NAME;
-  sessionConfig.store = MongoStore.create({
+  sessionConfig.store = new MongoStore({
     mongoUrl: mongoUrl,
     dbName: dbName,
     touchAfter: 24 * 3600, // lazy session update (in seconds)
