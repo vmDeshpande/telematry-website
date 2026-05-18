@@ -7,7 +7,7 @@ It is intended to live in a separate repository from the main AI Agent Automatio
 ## Purpose
 
 - Receive anonymous telemetry heartbeats from opted-in AI Agent Automation deployments.
-- Store telemetry events in the collector's own SQLite database.
+- Store telemetry events in MongoDB.
 - Provide a protected dashboard for authorized admins.
 - Stay operational independently from the main app repository and release cycle.
 
@@ -50,7 +50,8 @@ cp .env.example .env
 
 - `SESSION_SECRET`: Generate a secure random string (e.g., `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`)
 - `TELEMETRY_ADMIN_PASSWORD`: Set a strong password for dashboard access
-- `TELEMETRY_DB_PATH`: Path to SQLite database (default: `./telemetry.db` for dev, `/tmp/telemetry.db` for production)
+- `MONGODB_URI`: MongoDB connection string, including credentials when required
+- `MONGODB_DB_NAME`: MongoDB database name (default: `telemetry_collector`)
 - `PORT`: Server port (default: `3000`)
 - `TELEMETRY_RATE_LIMIT_MAX_REQUESTS`: Max requests per window (default: `60`)
 - `TELEMETRY_RATE_LIMIT_WINDOW_MS`: Rate limit window in ms (default: `60000`)
@@ -69,6 +70,8 @@ The collector will be available at `http://localhost:3000`.
 2. Add environment variables in Vercel project settings:
    - `SESSION_SECRET`: Generate a secure random value
    - `TELEMETRY_ADMIN_PASSWORD`: Set a strong password
+   - `MONGODB_URI`: MongoDB Atlas or self-hosted MongoDB connection string
+   - `MONGODB_DB_NAME`: Database name, for example `telemetry_collector`
    - `NODE_ENV`: Set to `production`
 3. Deploy with:
 

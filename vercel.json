@@ -3,7 +3,7 @@
   "buildCommand": "npm run build",
   "env": {
     "NODE_ENV": "production",
-    "TELEMETRY_DB_PATH": "/tmp/telemetry.db",
+    "MONGODB_DB_NAME": "telemetry_collector",
     "TELEMETRY_RATE_LIMIT_MAX_REQUESTS": "60",
     "TELEMETRY_RATE_LIMIT_WINDOW_MS": "60000",
     "PORT": "3000"

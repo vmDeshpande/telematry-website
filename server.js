@@ -1,29 +1,27 @@
 require("dotenv").config();
 const express = require("express");
 const session = require("express-session");
-const sqlite3 = require("sqlite3").verbose();
+const { MongoClient } = require("mongodb");
 const path = require("path");
 const app = express();
 
 const PORT = process.env.PORT || 4000;
 const SESSION_SECRET = process.env.SESSION_SECRET;
 const ADMIN_PASSWORD = process.env.TELEMETRY_ADMIN_PASSWORD;
-const DB_PATH = process.env.TELEMETRY_DB_PATH || path.join(__dirname, "telemetry.db");
+const MONGODB_URI = process.env.MONGODB_URI;
+const MONGODB_DB_NAME = process.env.MONGODB_DB_NAME || "telemetry_collector";
 const RATE_LIMIT_WINDOW_MS = parseInt(process.env.TELEMETRY_RATE_LIMIT_WINDOW_MS, 10) || 60000;
 const RATE_LIMIT_MAX_REQUESTS = parseInt(process.env.TELEMETRY_RATE_LIMIT_MAX_REQUESTS, 10) || 60;
 const rateLimitStore = new Map();
 
-if (!SESSION_SECRET || !ADMIN_PASSWORD) {
-  console.error("Missing required environment variables. Please set SESSION_SECRET and TELEMETRY_ADMIN_PASSWORD.");
+if (!SESSION_SECRET || !ADMIN_PASSWORD || !MONGODB_URI) {
+  console.error("Missing required environment variables. Please set SESSION_SECRET, TELEMETRY_ADMIN_PASSWORD, and MONGODB_URI.");
   process.exit(1);
 }
 
-const db = new sqlite3.Database(DB_PATH, (err) => {
-  if (err) {
-    console.error("Failed to open telemetry database:", err.message);
-    process.exit(1);
-  }
-});
+const mongoClient = new MongoClient(MONGODB_URI);
+let instancesCollection;
+let eventsCollection;
 
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
@@ -55,8 +53,6 @@ function requireAuth(req, res, next) {
   }
   return res.redirect("/login");
 }
-
-
 
 function cleanupRateLimitStore() {
   const now = Date.now();
@@ -113,7 +109,9 @@ function validateTelemetryPayload(payload) {
     typeof payload.version === "string" &&
     typeof payload.platform === "string" &&
     payload.timestamp &&
-    typeof payload.features === "object"
+    payload.features &&
+    typeof payload.features === "object" &&
+    !Array.isArray(payload.features)
   );
 }
 
@@ -146,93 +144,80 @@ app.get("/logout", (req, res) => {
   });
 });
 
-app.post("/collector", rateLimitCollector, (req, res) => {
+app.post("/collector", rateLimitCollector, async (req, res) => {
   const payload = req.body;
 
   if (!validateTelemetryPayload(payload)) {
     return res.status(400).json({ ok: false, error: "invalid_payload" });
   }
 
-  const serializedFeatures = normalizeFeatures(payload.features);
   const now = new Date().toISOString();
 
-  db.serialize(() => {
-    db.run(
-      `INSERT OR REPLACE INTO instances (instanceId, version, platform, features, lastSeen) VALUES (?, ?, ?, ?, ?)`,
-      [payload.instanceId, payload.version, payload.platform, serializedFeatures, now],
-      (err) => {
-        if (err) {
-          console.error("Failed to store telemetry instance:", err.message);
-          return res.status(500).json({ ok: false, error: "database_error" });
-        }
-
-        db.run(
-          `INSERT INTO events (instanceId, version, platform, features, timestamp, receivedAt) VALUES (?, ?, ?, ?, ?, ?)`,
-          [payload.instanceId, payload.version, payload.platform, serializedFeatures, payload.timestamp, now],
-          (err2) => {
-            if (err2) {
-              console.error("Failed to store telemetry event:", err2.message);
-              return res.status(500).json({ ok: false, error: "database_error" });
-            }
-
-            return res.json({ ok: true });
-          }
-        );
-      }
+  try {
+    await instancesCollection.updateOne(
+      { instanceId: payload.instanceId },
+      {
+        $set: {
+          instanceId: payload.instanceId,
+          version: payload.version,
+          platform: payload.platform,
+          features: payload.features,
+          lastSeen: now,
+        },
+      },
+      { upsert: true }
     );
-  });
+
+    await eventsCollection.insertOne({
+      instanceId: payload.instanceId,
+      version: payload.version,
+      platform: payload.platform,
+      features: payload.features,
+      timestamp: payload.timestamp,
+      receivedAt: now,
+    });
+
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error("Failed to store telemetry data:", err.message);
+    return res.status(500).json({ ok: false, error: "database_error" });
+  }
 });
 
 app.get("/dashboard", requireAuth, (req, res) => {
   res.sendFile(path.join(__dirname, "public", "dashboard.html"));
 });
 
-app.get("/api/dashboard", requireAuth, (req, res) => {
-  db.serialize(() => {
-    db.all(
-      `SELECT instanceId, version, platform, features, timestamp, receivedAt FROM events ORDER BY receivedAt DESC LIMIT 100`,
-      (err, events) => {
-        if (err) {
-          return res.status(500).json({ ok: false, error: "failed_to_load_events" });
-        }
+app.get("/api/dashboard", requireAuth, async (req, res) => {
+  try {
+    const [events, eventCount, instanceCount, latestEvent] = await Promise.all([
+      eventsCollection
+        .find({}, { projection: { _id: 0, instanceId: 1, version: 1, platform: 1, features: 1, timestamp: 1, receivedAt: 1 } })
+        .sort({ receivedAt: -1 })
+        .limit(100)
+        .toArray(),
+      eventsCollection.countDocuments(),
+      instancesCollection.countDocuments(),
+      eventsCollection.findOne({}, { projection: { _id: 0, receivedAt: 1 }, sort: { receivedAt: -1 } }),
+    ]);
 
-        db.get(`SELECT COUNT(*) AS count FROM events`, (countErr, countRow) => {
-          if (countErr) {
-            return res.status(500).json({ ok: false, error: "failed_to_count_events" });
-          }
-
-          db.get(`SELECT COUNT(*) AS count FROM instances`, (instanceErr, instanceRow) => {
-            if (instanceErr) {
-              return res.status(500).json({ ok: false, error: "failed_to_count_instances" });
-            }
-
-            db.get(
-              `SELECT MAX(receivedAt) AS latestReceivedAt FROM events`,
-              (latestErr, latestRow) => {
-                if (latestErr) {
-                  return res.status(500).json({ ok: false, error: "failed_to_get_latest_event" });
-                }
-
-                return res.json({
-                  ok: true,
-                  stats: {
-                    eventCount: countRow?.count || 0,
-                    instanceCount: instanceRow?.count || 0,
-                    latestReceivedAt: latestRow?.latestReceivedAt || null,
-                    collectorStatus: "Active",
-                  },
-                  events: events.map((event) => ({
-                    ...event,
-                    features: event.features || "{}",
-                  })),
-                });
-              }
-            );
-          });
-        });
-      }
-    );
-  });
+    return res.json({
+      ok: true,
+      stats: {
+        eventCount,
+        instanceCount,
+        latestReceivedAt: latestEvent?.receivedAt || null,
+        collectorStatus: "Active",
+      },
+      events: events.map((event) => ({
+        ...event,
+        features: normalizeFeatures(event.features),
+      })),
+    });
+  } catch (err) {
+    console.error("Failed to load dashboard data:", err.message);
+    return res.status(500).json({ ok: false, error: "failed_to_load_dashboard" });
+  }
 });
 
 app.get("/health", (req, res) => {
@@ -243,33 +228,26 @@ app.use((req, res) => {
   res.status(404).send("Not Found");
 });
 
-function initializeDatabase() {
-  db.serialize(() => {
-    db.run(
-      `CREATE TABLE IF NOT EXISTS instances (
-        instanceId TEXT PRIMARY KEY,
-        version TEXT,
-        platform TEXT,
-        features TEXT,
-        lastSeen TEXT
-      )`
-    );
-    db.run(
-      `CREATE TABLE IF NOT EXISTS events (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        instanceId TEXT,
-        version TEXT,
-        platform TEXT,
-        features TEXT,
-        timestamp TEXT,
-        receivedAt TEXT
-      )`
-    );
-  });
+async function initializeDatabase() {
+  await mongoClient.connect();
+  const database = mongoClient.db(MONGODB_DB_NAME);
+  instancesCollection = database.collection("instances");
+  eventsCollection = database.collection("events");
+
+  await Promise.all([
+    instancesCollection.createIndex({ instanceId: 1 }, { unique: true }),
+    eventsCollection.createIndex({ receivedAt: -1 }),
+    eventsCollection.createIndex({ instanceId: 1 }),
+  ]);
 }
 
-initializeDatabase();
-
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`📡 Telemetry collector running on http://localhost:${PORT}`);
-});
+initializeDatabase()
+  .then(() => {
+    app.listen(PORT, "0.0.0.0", () => {
+      console.log(`Telemetry collector running on http://localhost:${PORT}`);
+    });
+  })
+  .catch((err) => {
+    console.error("Failed to connect to MongoDB:", err.message);
+    process.exit(1);
+  });
